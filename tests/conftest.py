@@ -1,4 +1,19 @@
+import json
 import pytest
+
+
+with open("configurations.json") as f:
+    configuration = json.load(f)
+
+
+@pytest.fixture(scope="function", autouse=True)
+def shared_setup(fn_isolation):
+    pass
+
+
+@pytest.fixture(scope="module", params=configuration["vaults"])
+def config(request):
+    return request.param
 
 
 @pytest.fixture
@@ -30,12 +45,6 @@ def guardian(accounts):
 
 
 @pytest.fixture
-def vault(gov, rewards, guardian, token, Vault):
-    vault = guardian.deploy(Vault, token, gov, rewards, "", "")
-    yield vault
-
-
-@pytest.fixture
 def strategist(accounts):
     # You! Our new Strategist!
     yield accounts[3]
@@ -45,13 +54,6 @@ def strategist(accounts):
 def keeper(accounts):
     # This is our trusty bot!
     yield accounts[4]
-
-
-@pytest.fixture
-def strategy(strategist, keeper, vault, Strategy):
-    strategy = strategist.deploy(Strategy, vault)
-    strategy.setKeeper(keeper)
-    yield strategy
 
 
 @pytest.fixture
