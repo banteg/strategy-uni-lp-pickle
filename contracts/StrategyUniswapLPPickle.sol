@@ -9,6 +9,7 @@ import "@openzeppelinV3/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelinV3/contracts/math/SafeMath.sol";
 import "@openzeppelinV3/contracts/utils/Address.sol";
 import "@openzeppelinV3/contracts/token/ERC20/SafeERC20.sol";
+import "@openzeppelinV3/contracts/math/Math.sol";
 
 interface PickleJar {
     function deposit(uint256 _amount) external;
@@ -26,6 +27,7 @@ interface PickleChef {
 interface UniswapPair {
     function token0() external view returns (address);
     function token1() external view returns (address);
+    function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast);
 }
 
 interface Uniswap {
@@ -47,6 +49,8 @@ interface Uniswap {
         address to,
         uint deadline
     ) external returns (uint amountA, uint amountB, uint liquidity);
+
+    function getAmountsOut(uint amountIn, address[] memory path) external view returns (uint[] memory amounts);
 }
 
 contract Strategy is BaseStrategy {
@@ -87,11 +91,17 @@ contract Strategy is BaseStrategy {
      * Provide an accurate expected value for the return this strategy
      * would provide to the Vault if `report()` was called right now
      */
-    function expectedReturn() public override view returns (uint256) {
-        // TODO: Build a more accurate estimate using the value of all returns in terms of `want`
-        return 0;
+    function expectedReturn() public override view returns (uint256 _liquidity) {
+        uint256 _earned = PickleChef(chef).pendingPickle(pid, address(this));
+        uint256 _amount0 = quote(reward, token0, _earned / 2);
+        uint256 _amount1 = quote(reward, token1, _earned / 2);
+        (uint112 _reserve0, uint112 _reserve1, ) = UniswapPair(address(want)).getReserves();
+        uint256 _supply = IERC20(want).totalSupply();
+        return Math.min(
+            _amount0 * _supply / _reserve0,
+            _amount0 * _supply / _reserve0
+        );
     }
-
     /*
      * Provide an accurate estimate for the total amount of assets (principle + return)
      * that this strategy is currently managing, denominated in terms of `want` tokens.
@@ -134,6 +144,20 @@ contract Strategy is BaseStrategy {
         _amount = IERC20(reward).balanceOf(address(this));
         swap(reward, token1, _amount);
         add_liquidity();
+    }
+
+    function quote(address token_in, address token_out, uint256 amount_in) internal view returns (uint256) {
+        bool is_weth = token_in == weth || token_out == weth;
+        address[] memory path = new address[](is_weth ? 2 : 3);
+        path[0] = token_in;
+        if (is_weth) {
+            path[1] = token_out;
+        } else {
+            path[1] = weth;
+            path[2] = token_out;
+        }
+        uint256[] memory amounts = Uniswap(uniswap).getAmountsOut(amount_in, path);
+        return amounts[amounts.length - 1];
     }
 
     function swap(address token_in, address token_out, uint amount_in) internal {
