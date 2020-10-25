@@ -69,6 +69,7 @@ contract Strategy is BaseStrategy {
     uint256 public pid;
     address token0;
     address token1;
+    uint256 gasFactor = 200;
 
     constructor(address _vault, address _jar, uint256 _pid) public BaseStrategy(_vault) {
         jar = _jar;
@@ -268,8 +269,14 @@ contract Strategy is BaseStrategy {
      * NOTE: this call and `tendTrigger` should never return `true` at the same time.
      */
     function harvestTrigger(uint256 gasCost) public override view returns (bool) {
-        gasCost; // TODO: Do something with gas costs
-        return false; // TODO: Provide a trigger when a harvest should be performed
+        uint256 _earned = PickleChef(chef).pendingPickle(pid, address(this));
+        uint256 _return = quote(reward, weth, _earned);
+        return _return > gasCost * gasFactor;
+    }
+
+    function setGasFactor(uint256 _gasFactor) public {
+        require(msg.sender == strategist || msg.sender == governance());
+        gasFactor = _gasFactor;
     }
 
     /*
