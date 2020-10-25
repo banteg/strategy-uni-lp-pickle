@@ -153,51 +153,6 @@ contract Strategy is BaseStrategy {
         add_liquidity();
     }
 
-    function quote(address token_in, address token_out, uint256 amount_in) internal view returns (uint256) {
-        bool is_weth = token_in == weth || token_out == weth;
-        address[] memory path = new address[](is_weth ? 2 : 3);
-        path[0] = token_in;
-        if (is_weth) {
-            path[1] = token_out;
-        } else {
-            path[1] = weth;
-            path[2] = token_out;
-        }
-        uint256[] memory amounts = Uniswap(uniswap).getAmountsOut(amount_in, path);
-        return amounts[amounts.length - 1];
-    }
-
-    function swap(address token_in, address token_out, uint amount_in) internal {
-        bool is_weth = token_in == weth || token_out == weth;
-        address[] memory path = new address[](is_weth ? 2 : 3);
-        path[0] = token_in;
-        if (is_weth) {
-            path[1] = token_out;
-        } else {
-            path[1] = weth;
-            path[2] = token_out;
-        }
-        Uniswap(uniswap).swapExactTokensForTokens(
-            amount_in,
-            0,
-            path,
-            address(this),
-            block.timestamp
-        );
-    }
-
-    function add_liquidity() internal {
-        Uniswap(uniswap).addLiquidity(
-            token0,
-            token1,
-            IERC20(token0).balanceOf(address(this)),
-            IERC20(token1).balanceOf(address(this)),
-            0, 0,
-            address(this),
-            block.timestamp
-        );
-    }
-
     /*
      * Perform any adjustments to the core position(s) of this strategy given
      * what change the Vault made in the "investable capital" available to the
@@ -292,4 +247,52 @@ contract Strategy is BaseStrategy {
     //       that you don't want swept away from you randomly.
     //       By default, only contains `want`
     // function protectedTokens() internal override view returns (address[] memory)
+
+    // ******** HELPER METHODS ************
+
+    function quote(address token_in, address token_out, uint256 amount_in) internal view returns (uint256) {
+        bool is_weth = token_in == weth || token_out == weth;
+        address[] memory path = new address[](is_weth ? 2 : 3);
+        path[0] = token_in;
+        if (is_weth) {
+            path[1] = token_out;
+        } else {
+            path[1] = weth;
+            path[2] = token_out;
+        }
+        uint256[] memory amounts = Uniswap(uniswap).getAmountsOut(amount_in, path);
+        return amounts[amounts.length - 1];
+    }
+
+    function swap(address token_in, address token_out, uint amount_in) internal {
+        bool is_weth = token_in == weth || token_out == weth;
+        address[] memory path = new address[](is_weth ? 2 : 3);
+        path[0] = token_in;
+        if (is_weth) {
+            path[1] = token_out;
+        } else {
+            path[1] = weth;
+            path[2] = token_out;
+        }
+        Uniswap(uniswap).swapExactTokensForTokens(
+            amount_in,
+            0,
+            path,
+            address(this),
+            block.timestamp
+        );
+    }
+
+    function add_liquidity() internal {
+        Uniswap(uniswap).addLiquidity(
+            token0,
+            token1,
+            IERC20(token0).balanceOf(address(this)),
+            IERC20(token1).balanceOf(address(this)),
+            0, 0,
+            address(this),
+            block.timestamp
+        );
+    }
+
 }
