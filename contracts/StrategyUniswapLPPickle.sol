@@ -20,7 +20,14 @@ contract Strategy is BaseStrategy {
     using Address for address;
     using SafeMath for uint256;
 
-    constructor(address _vault) public BaseStrategy(_vault) {}
+    string public constant name = "StrategyUniswapLPPickle";
+    address public constant chef = 0xbD17B1ce622d73bD438b9E658acA5996dc394b0d;
+    address public constant reward = 0x429881672B9AE42b8EbA0E26cD9C73711b891Ca5;
+    address public jar;
+
+    constructor(address _vault, address _jar) public BaseStrategy(_vault) {
+        jar = _jar;
+    }
 
     // ******** OVERRIDE THESE METHODS FROM BASE CONTRACT ************
 
