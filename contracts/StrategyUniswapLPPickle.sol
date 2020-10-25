@@ -209,8 +209,7 @@ contract Strategy is BaseStrategy {
      * NOTE: if `tend()` is never intended to be called, it should always return `false`
      */
     function tendTrigger(uint256 gasCost) public override view returns (bool) {
-        gasCost; // TODO: Do something with gas costs
-        return false; // TODO: Provide a trigger when a tend should be performed (optional)
+        return false;
     }
 
     /*
@@ -240,7 +239,8 @@ contract Strategy is BaseStrategy {
      */
     function prepareMigration(address _newStrategy) internal override {
         // TODO: Transfer any non-`want` tokens to the new strategy
-        want.transfer(_newStrategy, want.balanceOf(address(this))); // (Optional)
+        exitPosition();
+        want.transfer(_newStrategy, want.balanceOf(address(this)));
     }
 
     // NOTE: Override this if you typically manage tokens inside this contract
