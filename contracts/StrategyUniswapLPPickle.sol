@@ -224,6 +224,9 @@ contract Strategy is BaseStrategy {
      */
     function exitPosition() internal override {
         // TODO: Do stuff here to free up as much as possible of all positions back into `want`
+        (uint256 _staked, ) = PickleChef(chef).userInfo(pid, address(this));
+        PickleChef(chef).withdraw(pid, _staked);
+        PickleJar(jar).withdraw(IERC20(jar).balanceOf(address(this)));
     }
 
     /*
@@ -232,6 +235,10 @@ contract Strategy is BaseStrategy {
      */
     function liquidatePosition(uint256 _amount) internal override {
         // TODO: Do stuff here to free up `_amount` from all positions back into `want`
+        (uint256 _staked, ) = PickleChef(chef).userInfo(pid, address(this));
+        uint256 _withdraw = _amount * 1e18 / PickleJar(jar).getRatio();
+        PickleChef(chef).withdraw(pid, _withdraw);
+        PickleJar(jar).withdraw(IERC20(jar).balanceOf(address(this)));
     }
 
     /*
