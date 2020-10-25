@@ -15,6 +15,7 @@ interface PickleJar {
     function deposit(uint256 _amount) external;
     function withdraw(uint256 _shares) external;
     function token() external view returns (address);
+    function getRatio() external view returns (uint256);
 }
 
 interface PickleChef {
@@ -22,6 +23,7 @@ interface PickleChef {
     function withdraw(uint256 _pid, uint256 _amount) external;
     function poolInfo(uint256 _pid) external view returns (address, uint256, uint256, uint256);
     function pendingPickle(uint256 _pid, address _user) external view returns (uint256);
+    function userInfo(uint256 _pid, address _user) external view returns (uint256, uint256);
 }
 
 interface UniswapPair {
@@ -122,7 +124,11 @@ contract Strategy is BaseStrategy {
      */
     function estimatedTotalAssets() public override view returns (uint256) {
         // TODO: Build a more accurate estimate using the value of all positions in terms of `want`
-        return want.balanceOf(address(this));
+        (uint256 _staked, ) = PickleChef(chef).userInfo(pid, address(this));
+        uint256 _ratio = PickleJar(jar).getRatio();
+        uint256 _staked_want = _staked * _ratio / 1e18;
+        uint256 _unrealized_profit = expectedReturn();
+        return want.balanceOf(address(this)) + _staked_want + _unrealized_profit;
     }
 
     /*
