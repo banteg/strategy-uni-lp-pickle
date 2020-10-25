@@ -1,0 +1,30 @@
+{
+    "reward": "0x429881672B9AE42b8EbA0E26cD9C73711b891Ca5",
+    "chef": "0xbD17B1ce622d73bD438b9E658acA5996dc394b0d",
+    "vaults": [
+        {
+            "name": "USDT/WETH",
+            "want": "0x0d4a11d5EEaaC28EC3F61d100daF4d40471f1852",
+            "jar": "0x09FC573c502037B149ba87782ACC81cF093EC6ef",
+            "pid": 12
+        },
+        {
+            "name": "USDC/WETH",
+            "want": "0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc",
+            "jar": "0x53Bf2E62fA20e2b4522f05de3597890Ec1b352C6",
+            "pid": 11
+        },
+        {
+            "name": "DAI/WETH",
+            "want": "0xA478c2975Ab1Ea89e8196811F51A7B7Ade33eB11",
+            "jar": "0xCffA068F1E44D98D3753966eBd58D4CFe3BB5162",
+            "pid": 10
+        },
+        {
+            "name": "WBTC/WETH",
+            "want": "0xBb2b8038a1640196FbE3e38816F3e67Cba72D940",
+            "jar": "0xc80090AA05374d336875907372EE4ee636CBC562",
+            "pid": 15
+        }
+    ]
+}
