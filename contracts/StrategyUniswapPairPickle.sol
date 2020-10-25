@@ -55,7 +55,7 @@ interface Uniswap {
     function getAmountsOut(uint amountIn, address[] memory path) external view returns (uint[] memory amounts);
 }
 
-contract StrategyUniswapLPPickle is BaseStrategy {
+contract StrategyUniswapPairPickle is BaseStrategy {
     using SafeERC20 for IERC20;
     using Address for address;
     using SafeMath for uint256;
