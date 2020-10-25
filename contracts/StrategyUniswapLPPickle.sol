@@ -23,6 +23,32 @@ interface PickleChef {
     function pendingPickle(uint256 _pid, address _user) external view returns (uint256);
 }
 
+interface UniswapPair {
+    function token0() external view returns (address);
+    function token1() external view returns (address);
+}
+
+interface Uniswap {
+    function swapExactTokensForTokens(
+        uint256 amountIn,
+        uint256 amountOutMin,
+        address[] calldata path,
+        address to,
+        uint256 deadline
+    ) external returns (uint256[] memory amounts);
+    
+    function addLiquidity(
+        address tokenA,
+        address tokenB,
+        uint amountADesired,
+        uint amountBDesired,
+        uint amountAMin,
+        uint amountBMin,
+        address to,
+        uint deadline
+    ) external returns (uint amountA, uint amountB, uint liquidity);
+}
+
 contract Strategy is BaseStrategy {
     using SafeERC20 for IERC20;
     using Address for address;
@@ -35,6 +61,8 @@ contract Strategy is BaseStrategy {
     address public constant weth = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     address public jar;
     uint256 public pid;
+    address token0;
+    address token1;
 
     constructor(address _vault, address _jar, uint256 _pid) public BaseStrategy(_vault) {
         jar = _jar;
@@ -44,9 +72,13 @@ contract Strategy is BaseStrategy {
         (address lp,,,) = PickleChef(chef).poolInfo(pid);
         require(lp == jar, "wrong pid");
 
+        token0 = UniswapPair(address(want)).token0();
+        token1 = UniswapPair(address(want)).token1();
         want.safeApprove(jar, type(uint256).max);
         IERC20(jar).safeApprove(chef, type(uint256).max);
         IERC20(reward).safeApprove(uniswap, type(uint256).max);
+        IERC20(token0).safeApprove(uniswap, type(uint256).max);
+        IERC20(token1).safeApprove(uniswap, type(uint256).max);
     }
 
     // ******** OVERRIDE THESE METHODS FROM BASE CONTRACT ************
@@ -95,6 +127,44 @@ contract Strategy is BaseStrategy {
      */
     function prepareReturn() internal override {
         // TODO: Do stuff here to free up any returns back into `want`
+        PickleChef(chef).deposit(pid, 0);
+        uint _amount = IERC20(reward).balanceOf(address(this));
+        if (_amount == 0) return;
+        swap(reward, token0, _amount / 2);
+        _amount = IERC20(reward).balanceOf(address(this));
+        swap(reward, token1, _amount);
+        add_liquidity();
+    }
+
+    function swap(address token_in, address token_out, uint amount_in) internal {
+        bool is_weth = token_in == weth || token_out == weth;
+        address[] memory path = new address[](is_weth ? 2 : 3);
+        path[0] = token_in;
+        if (is_weth) {
+            path[1] = token_out;
+        } else {
+            path[1] = weth;
+            path[2] = token_out;
+        }
+        Uniswap(uniswap).swapExactTokensForTokens(
+            amount_in,
+            0,
+            path,
+            address(this),
+            block.timestamp
+        );
+    }
+
+    function add_liquidity() internal {
+        Uniswap(uniswap).addLiquidity(
+            token0,
+            token1,
+            IERC20(token0).balanceOf(address(this)),
+            IERC20(token1).balanceOf(address(this)),
+            0, 0,
+            address(this),
+            block.timestamp
+        );
     }
 
     /*
