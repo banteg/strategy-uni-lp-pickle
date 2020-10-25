@@ -1,6 +1,6 @@
 #@version 0.2.7
 
-CONTRACT_VERSION: constant(String[28]) = "0.1.1"
+CONTRACT_VERSION: constant(String[28]) = "0.1.2"
 
 # TODO: Add ETH Configuration
 # TODO: Add Delegated Configuration
@@ -104,11 +104,11 @@ def __init__(
     # TODO: Non-detailed Configuration?
     self.token = ERC20(_token)
     if _nameOverride == "":
-        self.name = concat("yearn ", DetailedERC20(_token).name())
+        self.name = concat(DetailedERC20(_token).symbol(), " yVault")
     else:
         self.name = _nameOverride
     if _symbolOverride == "":
-        self.symbol = concat("y", DetailedERC20(_token).symbol())
+        self.symbol = concat("yv", DetailedERC20(_token).symbol())
     else:
         self.symbol = _symbolOverride
     self.decimals = DetailedERC20(_token).decimals()
@@ -125,6 +125,18 @@ def __init__(
 @external
 def version() -> String[28]:
     return CONTRACT_VERSION
+
+
+@external
+def setName(_name: String[42]):
+    assert msg.sender == self.governance
+    self.name = _name
+
+
+@external
+def setSymbol(_symbol: String[20]):
+    assert msg.sender == self.governance
+    self.symbol = _symbol
 
 
 # 2-phase commit for a change in governance
@@ -302,10 +314,13 @@ def _issueSharesForAmount(_to: address, _amount: uint256) -> uint256:
     return shares
 
 
-@external
-def deposit(_amount: uint256) -> uint256:
+@internal
+def _deposit(_sender: address, _amount: uint256) -> uint256:
     assert not self.emergencyShutdown  # Deposits are locked out
     assert self._totalAssets() + _amount <= self.depositLimit  # Max deposit reached
+
+    # Ensure we are depositing something
+    assert _amount > 0
 
     # NOTE: Measuring this based on the total outstanding debt that this contract
     #       has ("expected value") instead of the total balance sheet it has
@@ -327,15 +342,25 @@ def deposit(_amount: uint256) -> uint256:
     #       on-chain) to determine if depositing into the Vault is a "good idea"
 
     # Issue new shares (needs to be done before taking deposit to be accurate)
-    shares: uint256 = self._issueSharesForAmount(msg.sender, _amount)
+    shares: uint256 = self._issueSharesForAmount(_sender, _amount)
 
     # Get new collateral
     reserve: uint256 = self.token.balanceOf(self)
-    self.token.transferFrom(msg.sender, self, _amount)
+    self.token.transferFrom(_sender, self, _amount)
     # TODO: `Deflationary` configuration only
     assert self.token.balanceOf(self) - reserve == _amount  # Deflationary token check
 
     return shares  # Just in case someone wants them
+
+
+@external
+def depositAll() -> uint256:
+    return self._deposit(msg.sender, self.token.balanceOf(msg.sender))
+
+
+@external
+def deposit(_amount: uint256) -> uint256:
+    return self._deposit(msg.sender, _amount)
 
 
 @view
