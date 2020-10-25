@@ -1,7 +1,5 @@
-// SPDX-License-Identifier: GPL-3.0
-// Feel free to change the license, but this is what we use
+// SPDX-License-Identifier: AGPLv3
 
-// Feel free to change this version of Solidity. We support >=0.6.0 <0.7.0;
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
@@ -12,8 +10,18 @@ import "@openzeppelinV3/contracts/math/SafeMath.sol";
 import "@openzeppelinV3/contracts/utils/Address.sol";
 import "@openzeppelinV3/contracts/token/ERC20/SafeERC20.sol";
 
-// Import interfaces for many popular DeFi projects, or add your own!
-//import "../interfaces/<protocol>/<Interface>.sol";
+interface PickleJar {
+    function deposit(uint256 _amount) external;
+    function withdraw(uint256 _shares) external;
+    function token() external view returns (address);
+}
+
+interface PickleChef {
+    function deposit(uint256 _pid, uint256 _amount) external;
+    function withdraw(uint256 _pid, uint256 _amount) external;
+    function poolInfo(uint256 _pid) external view returns (address, uint256, uint256, uint256);
+    function pendingPickle(uint256 _pid, address _user) external view returns (uint256);
+}
 
 contract Strategy is BaseStrategy {
     using SafeERC20 for IERC20;
@@ -23,10 +31,22 @@ contract Strategy is BaseStrategy {
     string public constant name = "StrategyUniswapLPPickle";
     address public constant chef = 0xbD17B1ce622d73bD438b9E658acA5996dc394b0d;
     address public constant reward = 0x429881672B9AE42b8EbA0E26cD9C73711b891Ca5;
+    address public constant uniswap = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
+    address public constant weth = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     address public jar;
+    uint256 public pid;
 
-    constructor(address _vault, address _jar) public BaseStrategy(_vault) {
+    constructor(address _vault, address _jar, uint256 _pid) public BaseStrategy(_vault) {
         jar = _jar;
+        pid = _pid;
+
+        require(PickleJar(jar).token() == address(want), "wrong jar");
+        (address lp,,,) = PickleChef(chef).poolInfo(pid);
+        require(lp == jar, "wrong pid");
+
+        want.safeApprove(jar, type(uint256).max);
+        IERC20(jar).safeApprove(chef, type(uint256).max);
+        IERC20(reward).safeApprove(uniswap, type(uint256).max);
     }
 
     // ******** OVERRIDE THESE METHODS FROM BASE CONTRACT ************
@@ -85,7 +105,14 @@ contract Strategy is BaseStrategy {
      * be 0, and you should handle that scenario accordingly.
      */
     function adjustPosition() internal override {
-        // TODO: Do something to invest excess `want` tokens (from the Vault) into your positions
+        uint _amount = want.balanceOf(address(this));
+        if (_amount == 0) return;
+        // stake lp tokens in pickle jar
+        PickleJar(jar).deposit(_amount);
+        // stake jar in pickle farm
+        _amount = IERC20(jar).balanceOf(address(this));
+        if (_amount == 0) return;
+        PickleChef(chef).deposit(pid, _amount);
     }
 
     /*
