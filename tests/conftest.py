@@ -11,14 +11,14 @@ def shared_setup(fn_isolation):
     pass
 
 
-@pytest.fixture(scope="module", params=configurations["vaults"])
+@pytest.fixture(scope="module", params=configurations["vaults"][:1])
 def config(request):
     return {**configurations["common"], **request.param}
 
 
 @pytest.fixture
-def vault(config, Vault, gov, rewards, guardian):
-    return Vault.deploy(
+def vault(config, Vault, gov, rewards, guardian, token, whale):
+    vault = Vault.deploy(
         config["want"],
         gov,
         rewards,
@@ -26,14 +26,27 @@ def vault(config, Vault, gov, rewards, guardian):
         config["symbol"],
         {"from": guardian},
     )
+    deposit = token.balanceOf(whale) / 2
+    token.approve(vault, token.balanceOf(whale), {"from": whale})
+    vault.deposit(deposit, {"from": whale})
+    assert token.balanceOf(vault) == vault.balanceOf(whale) == deposit
+    assert vault.totalDebt() == 0  # No connected strategies yet
+    return vault
 
 
 @pytest.fixture
-def strategy(config, StrategyUniswapPairPickle, vault, strategist, keeper):
+def strategy(config, StrategyUniswapPairPickle, vault, strategist, token, keeper, gov):
     strategy = StrategyUniswapPairPickle.deploy(
         vault, config["jar"], config["pid"], {"from": strategist}
     )
     strategy.setKeeper(keeper, {"from": strategist})
+    vault.addStrategy(
+        strategy,
+        token.totalSupply() / 2,  # Debt limit of 50% total supply
+        token.totalSupply() // 1000,  # Rate limt of 0.1% of token supply per block
+        50,  # 0.5% performance fee for Strategist
+        {"from": gov},
+    )
     return strategy
 
 
