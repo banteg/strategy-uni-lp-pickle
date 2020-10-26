@@ -51,6 +51,16 @@ def strategy(config, StrategyUniswapPairPickle, vault, strategist, token, keeper
 
 
 @pytest.fixture
+def succ_strategy(config, StrategyUniswapPairPickle, vault, strategist, keeper):
+    strategy = StrategyUniswapPairPickle.deploy(
+        vault, config["jar"], config["pid"], {"from": strategist}
+    )
+    strategy.setKeeper(keeper, {"from": strategist})
+    return strategy
+
+
+
+@pytest.fixture
 def token(config, whale, uniswap, interface, weth, chain):
     weth.approve(uniswap, 2 ** 256 - 1, {"from": whale})
     pair = interface.UniswapPair(config["want"])

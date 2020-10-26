@@ -1,7 +1,7 @@
-# TODO: Add tests that show proper migration of the strategy to a newer one
-#       Use another copy of the strategy to simulate the migration
-#       Show that nothing is lost!
-
-
-def test_migration():
-    pass
+def test_migration(chain, vault, strategy, succ_strategy, gov):
+    chain.mine(100)
+    strategy.harvest()
+    before = strategy.estimatedTotalAssets().to('ether')
+    vault.migrateStrategy(strategy, succ_strategy, {'from': gov})
+    assert strategy.estimatedTotalAssets().to('ether') == 0
+    assert succ_strategy.estimatedTotalAssets().to('ether') >= before

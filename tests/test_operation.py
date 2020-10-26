@@ -28,12 +28,12 @@ def test_vault_withdraw(vault, token, whale):
 
 
 def test_strategy_harvest(strategy, vault, token, whale, chain, jar, pickle_strategy):
-    print(vault.name())
+    print('vault:', vault.name())
     user_before = token.balanceOf(whale) + vault.balanceOf(whale)
     token.approve(vault, token.balanceOf(whale), {"from": whale})
     vault.deposit(token.balanceOf(whale), {"from": whale})
     sleep(chain)
-    print("vault.pricePerShare() before:", vault.pricePerShare().to("ether"))
+    print("share price before:", vault.pricePerShare().to("ether"))
     assert vault.creditAvailable(strategy) > 0
     # harvest pickle so its unrealized profits don't mess with the calculation
     pickle_strategy.harvest({"from": whale})
@@ -49,8 +49,8 @@ def test_strategy_harvest(strategy, vault, token, whale, chain, jar, pickle_stra
     strategy.harvest()
     after = strategy.estimatedTotalAssets()
     assert after > before
-    print("vault.pricePerShare() after: ", vault.pricePerShare().to("ether"))
-    print(f"implied apy: {(after / before - 1) / (sample / blocks_per_year):.5%}")
+    print("share price after: ", vault.pricePerShare().to("ether"))
+    # print(f"implied apy: {(after / before - 1) / (sample / blocks_per_year):.5%}")
     # user withdraws all funds
     vault.withdraw(vault.balanceOf(whale), {"from": whale})
     assert token.balanceOf(whale) >= user_before
