@@ -60,7 +60,7 @@ contract StrategyUniswapPairPickle is BaseStrategy {
     using Address for address;
     using SafeMath for uint256;
 
-    string public constant name = "StrategyUniswapLPPickle";
+    string public constant name = "StrategyUniswapPairPickle";
     address public constant chef = 0xbD17B1ce622d73bD438b9E658acA5996dc394b0d;
     address public constant reward = 0x429881672B9AE42b8EbA0E26cD9C73711b891Ca5;
     address public constant uniswap = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
