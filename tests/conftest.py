@@ -11,7 +11,7 @@ def shared_setup(fn_isolation):
     pass
 
 
-@pytest.fixture(scope="module", params=configurations["vaults"][:1])
+@pytest.fixture(scope="module", params=configurations["vaults"][2:3])
 def config(request):
     return {**configurations["common"], **request.param}
 
@@ -84,6 +84,13 @@ def token(config, whale, uniswap, interface, weth, chain):
     )
     print(pair.balanceOf(whale).to("ether"), "want obtained")
     return pair
+
+
+@pytest.fixture
+def pickle_strategy(config, token, interface):
+    jar = interface.PickleJar(config["jar"])
+    pickle_controller = interface.PickleController(jar.controller())
+    return interface.PickleStrategy(pickle_controller.strategies(token))
 
 
 @pytest.fixture
