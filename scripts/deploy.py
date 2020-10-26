@@ -17,7 +17,6 @@ def get_address(label):
 
 
 def main():
-    assert rpc.is_active()
     configurations = json.load(open("configurations.json"))
     for i, config in enumerate(configurations["vaults"]):
         print(f"[{i}] {config['name']}")
