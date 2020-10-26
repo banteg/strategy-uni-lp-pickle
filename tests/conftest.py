@@ -11,7 +11,7 @@ def shared_setup(fn_isolation):
     pass
 
 
-@pytest.fixture(scope="module", params=configurations["vaults"][2:3])
+@pytest.fixture(scope="module", params=configurations["vaults"])
 def config(request):
     return {**configurations["common"], **request.param}
 
@@ -82,7 +82,6 @@ def token(config, whale, uniswap, interface, weth, chain):
         chain[-1].timestamp + 1200,
         {"from": whale},
     )
-    print(pair.balanceOf(whale).to("ether"), "want obtained")
     return pair
 
 

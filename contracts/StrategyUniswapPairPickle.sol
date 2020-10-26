@@ -96,6 +96,7 @@ contract StrategyUniswapPairPickle is BaseStrategy {
      */
     function expectedReturn() public override view returns (uint256 _liquidity) {
         uint256 _earned = PickleChef(chef).pendingPickle(pid, address(this));
+        if (_earned == 0) return 0;
         uint256 _amount0 = quote(reward, token0, _earned / 2);
         uint256 _amount1 = quote(reward, token1, _earned / 2);
         (uint112 _reserve0, uint112 _reserve1, ) = UniswapPair(address(want)).getReserves();
