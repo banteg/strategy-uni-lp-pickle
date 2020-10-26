@@ -87,8 +87,12 @@ def token(config, whale, uniswap, interface, weth, chain):
 
 
 @pytest.fixture
-def pickle_strategy(config, token, interface):
-    jar = interface.PickleJar(config["jar"])
+def jar(config, interface):
+    return interface.PickleJar(config["jar"])
+
+
+@pytest.fixture
+def pickle_strategy(token, interface, jar):
     pickle_controller = interface.PickleController(jar.controller())
     return interface.PickleStrategy(pickle_controller.strategies(token))
 
