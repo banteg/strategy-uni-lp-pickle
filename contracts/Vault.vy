@@ -1,6 +1,6 @@
 #@version 0.2.7
 
-CONTRACT_VERSION: constant(String[28]) = "0.1.2"
+API_VERSION: constant(String[28]) = "0.1.2"
 
 # TODO: Add ETH Configuration
 # TODO: Add Delegated Configuration
@@ -123,8 +123,8 @@ def __init__(
 
 @pure
 @external
-def version() -> String[28]:
-    return CONTRACT_VERSION
+def apiVersion() -> String[28]:
+    return API_VERSION
 
 
 @external
@@ -231,13 +231,10 @@ def approve(_spender : address, _value : uint256) -> bool:
     @dev Approve the passed address to spend the specified amount of tokens on behalf of
          msg.sender. Beware that changing an allowance with this method brings the risk
          that someone may use both the old and the new allowance by unfortunate transaction
-         ordering. One possible solution to mitigate this race condition is to first reduce
-         the spender's allowance to 0 and set the desired value afterwards:
-         https://github.com/ethereum/EIPs/issues/20#issuecomment-263524729
+         ordering. See https://github.com/ethereum/EIPs/issues/20#issuecomment-263524729
     @param _spender The address which will spend the funds.
     @param _value The amount of tokens to be spent.
     """
-    assert _value == 0 or self.allowance[msg.sender][_spender] == 0
     self.allowance[msg.sender][_spender] = _value
     log Approval(msg.sender, _spender, _value)
     return True
@@ -314,13 +311,21 @@ def _issueSharesForAmount(_to: address, _amount: uint256) -> uint256:
     return shares
 
 
-@internal
-def _deposit(_sender: address, _amount: uint256) -> uint256:
+@external
+def deposit(_amount: uint256 = MAX_UINT256, _recipient: address = msg.sender) -> uint256:
     assert not self.emergencyShutdown  # Deposits are locked out
-    assert self._totalAssets() + _amount <= self.depositLimit  # Max deposit reached
+
+    amount: uint256 = _amount
+
+    # If _amount not specified, transfer the full token balance
+    if amount == MAX_UINT256:
+        amount = self.token.balanceOf(msg.sender)
 
     # Ensure we are depositing something
-    assert _amount > 0
+    assert amount > 0
+
+    # Ensure deposit limit is respected
+    assert self._totalAssets() + amount <= self.depositLimit
 
     # NOTE: Measuring this based on the total outstanding debt that this contract
     #       has ("expected value") instead of the total balance sheet it has
@@ -342,25 +347,17 @@ def _deposit(_sender: address, _amount: uint256) -> uint256:
     #       on-chain) to determine if depositing into the Vault is a "good idea"
 
     # Issue new shares (needs to be done before taking deposit to be accurate)
-    shares: uint256 = self._issueSharesForAmount(_sender, _amount)
+    # Shares are issued to recipient (may be different from msg.sender)
+    shares: uint256 = self._issueSharesForAmount(_recipient, amount)
 
     # Get new collateral
     reserve: uint256 = self.token.balanceOf(self)
-    self.token.transferFrom(_sender, self, _amount)
+    # Tokens are transferred from msg.sender (may be different from _recipient)
+    self.token.transferFrom(msg.sender, self, amount)
     # TODO: `Deflationary` configuration only
-    assert self.token.balanceOf(self) - reserve == _amount  # Deflationary token check
+    assert self.token.balanceOf(self) - reserve == amount  # Deflationary token check
 
     return shares  # Just in case someone wants them
-
-
-@external
-def depositAll() -> uint256:
-    return self._deposit(msg.sender, self.token.balanceOf(msg.sender))
-
-
-@external
-def deposit(_amount: uint256) -> uint256:
-    return self._deposit(msg.sender, _amount)
 
 
 @view
@@ -392,10 +389,15 @@ def maxAvailableShares() -> uint256:
 
 
 @external
-def withdraw(_shares: uint256):
-    # Limit to only the shares they own
-    assert _shares <= self.balanceOf[msg.sender]
+def withdraw(_shares: uint256 = MAX_UINT256, _recipient: address = msg.sender) -> uint256:
     shares: uint256 = _shares  # May reduce this number below
+
+    # If _shares not specified, transfer full share balance
+    if shares == MAX_UINT256:
+        shares = self.balanceOf[msg.sender]
+
+    # Limit to only the shares they own
+    assert shares <= self.balanceOf[msg.sender]
 
     # NOTE: Measuring this based on the total outstanding debt that this contract
     #       has ("expected value") instead of the total balance sheet it has
@@ -463,8 +465,10 @@ def withdraw(_shares: uint256):
     self.balanceOf[msg.sender] -= shares
     log Transfer(msg.sender, ZERO_ADDRESS, shares)
 
-    # Withdraw remaining balance (minus fee)
-    self.token.transfer(msg.sender, value)
+    # Withdraw remaining balance to _recipient (may be different to msg.sender) (minus fee)
+    self.token.transfer(_recipient, value)
+
+    return value
 
 
 @view
