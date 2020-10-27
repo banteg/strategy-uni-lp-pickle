@@ -24,10 +24,9 @@ def main():
     deployer = accounts.load(input("deployer account: "))
     gov = get_address("gov")
     rewards = get_address("rewards")
-
     vault = Vault.deploy(
         config["want"],
-        deployer,  # TODO change governance
+        gov,
         rewards,
         config["name"],
         config["symbol"],
@@ -36,14 +35,6 @@ def main():
     strategy = StrategyUniswapPairPickle.deploy(
         vault, config["jar"], config["pid"], {"from": deployer}
     )
-    token = interface.ERC20(config["want"])
-    vault.addStrategy(
-        strategy,
-        token.totalSupply(),
-        token.totalSupply() / 6525,  # fade in over 1d
-        50,
-    )
-    vault.setGovernance(gov)
     secho(
         f"deployed {config['symbol']}\nvault: {vault}\nstrategy: {strategy}\n",
         fg="green",
