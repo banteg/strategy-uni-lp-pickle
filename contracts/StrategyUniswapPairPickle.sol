@@ -60,7 +60,7 @@ contract StrategyUniswapPairPickle is BaseStrategy {
     using Address for address;
     using SafeMath for uint256;
 
-    string public constant name = "StrategyUniswapPairPickle";
+    string public constant override name = "StrategyUniswapPairPickle";
     address public constant chef = 0xbD17B1ce622d73bD438b9E658acA5996dc394b0d;
     address public constant reward = 0x429881672B9AE42b8EbA0E26cD9C73711b891Ca5;
     address public constant uniswap = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
@@ -247,7 +247,12 @@ contract StrategyUniswapPairPickle is BaseStrategy {
     // NOTE: Override this if you typically manage tokens inside this contract
     //       that you don't want swept away from you randomly.
     //       By default, only contains `want`
-    // function protectedTokens() internal override view returns (address[] memory)
+    function protectedTokens() internal override view returns (address[] memory) {
+        address[] memory protected = new address[](2);
+        protected[0] = address(want);
+        protected[1] = reward;
+        return protected;
+    }
 
     // ******** HELPER METHODS ************
 
