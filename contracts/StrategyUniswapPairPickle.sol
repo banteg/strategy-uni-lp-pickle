@@ -70,6 +70,7 @@ contract StrategyUniswapPairPickle is BaseStrategy {
     address token0;
     address token1;
     uint256 gasFactor = 200;
+    uint256 interval = 1000;
 
     constructor(address _vault, address _jar, uint256 _pid) public BaseStrategy(_vault) {
         jar = _jar;
@@ -223,14 +224,24 @@ contract StrategyUniswapPairPickle is BaseStrategy {
      * NOTE: this call and `tendTrigger` should never return `true` at the same time.
      */
     function harvestTrigger(uint256 gasCost) public override view returns (bool) {
+        uint256 _credit = vault.creditAvailable().mul(wantPrice()).div(1e18);
         uint256 _earned = PickleChef(chef).pendingPickle(pid, address(this));
         uint256 _return = quote(reward, weth, _earned);
-        return _return > gasCost.mul(gasFactor);
+        uint256 last_sync = vault.strategies(address(this)).lastSync;
+        bool time_trigger = block.number.sub(last_sync) >= interval;
+        bool cost_trigger = _return > gasCost.mul(gasFactor);
+        bool credit_trigger = _credit > gasCost.mul(gasFactor);
+        return time_trigger && (cost_trigger || credit_trigger);
     }
 
     function setGasFactor(uint256 _gasFactor) public {
         require(msg.sender == strategist || msg.sender == governance());
         gasFactor = _gasFactor;
+    }
+
+    function setInterval(uint256 _interval) public {
+        require(msg.sender == strategist || msg.sender == governance());
+        interval = _interval;
     }
 
     /*
@@ -254,6 +265,14 @@ contract StrategyUniswapPairPickle is BaseStrategy {
     }
 
     // ******** HELPER METHODS ************
+
+    // Quote want token in ether.
+    function wantPrice() public view returns (uint256) {
+        require(token0 == weth || token1 == weth);  // dev: can only quote weth pairs
+        (uint112 _reserve0, uint112 _reserve1, ) = UniswapPair(address(want)).getReserves();
+        uint256 _supply = IERC20(want).totalSupply();
+        return 2e18.mul(uint256(token0 == weth ? _reserve0 : _reserve1)).div(_supply);
+    }
 
     function quote(address token_in, address token_out, uint256 amount_in) internal view returns (uint256) {
         bool is_weth = token_in == weth || token_out == weth;
