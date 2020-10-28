@@ -103,7 +103,7 @@ contract StrategyUniswapPairPickle is BaseStrategy {
         uint256 _supply = IERC20(want).totalSupply();
         return Math.min(
             _amount0.mul(_supply).div(_reserve0),
-            _amount0.mul(_supply).div(_reserve0)
+            _amount1.mul(_supply).div(_reserve1)
         );
     }
     /*
@@ -144,7 +144,6 @@ contract StrategyUniswapPairPickle is BaseStrategy {
      * are sustained for long periods of time.
      */
     function prepareReturn() internal override {
-        // TODO: Do stuff here to free up any returns back into `want`
         PickleChef(chef).deposit(pid, 0);
         uint _amount = IERC20(reward).balanceOf(address(this));
         if (_amount == 0) return;
