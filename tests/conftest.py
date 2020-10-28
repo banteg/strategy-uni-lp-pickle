@@ -26,6 +26,7 @@ def vault(config, Vault, gov, rewards, guardian, token, whale):
         config["symbol"],
         {"from": guardian},
     )
+    vault.setManagementFee(0, {"from": gov})
     deposit = token.balanceOf(whale) / 2
     token.approve(vault, token.balanceOf(whale), {"from": whale})
     vault.deposit(deposit, {"from": whale})
@@ -57,7 +58,6 @@ def succ_strategy(config, StrategyUniswapPairPickle, vault, strategist, keeper):
     )
     strategy.setKeeper(keeper, {"from": strategist})
     return strategy
-
 
 
 @pytest.fixture
