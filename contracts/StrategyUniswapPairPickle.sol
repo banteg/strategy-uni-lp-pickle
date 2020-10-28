@@ -271,7 +271,7 @@ contract StrategyUniswapPairPickle is BaseStrategy {
         require(token0 == weth || token1 == weth);  // dev: can only quote weth pairs
         (uint112 _reserve0, uint112 _reserve1, ) = UniswapPair(address(want)).getReserves();
         uint256 _supply = IERC20(want).totalSupply();
-        return 2e18.mul(uint256(token0 == weth ? _reserve0 : _reserve1)).div(_supply);
+        return 2e18 * uint256(token0 == weth ? _reserve0 : _reserve1) / _supply;
     }
 
     function quote(address token_in, address token_out, uint256 amount_in) internal view returns (uint256) {
