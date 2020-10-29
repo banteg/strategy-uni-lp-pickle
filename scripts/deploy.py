@@ -1,6 +1,6 @@
 import json
 
-from brownie import StrategyUniswapPairPickle, Vault, accounts, interface, web3
+from brownie import StrategyUniswapPairPickle, Vault, accounts, rpc, web3
 from click import secho
 from eth_utils import is_checksum_address
 
@@ -44,3 +44,21 @@ def main():
         f"deployed {config['symbol']}\nvault: {vault}\nstrategy: {strategy}\n",
         fg="green",
     )
+
+
+def migrate():
+    assert rpc.is_active()
+    vault = Vault.at(get_address('vault'))
+    gov = accounts.at(vault.governance(), force=True)
+    old_strategy = StrategyUniswapPairPickle.at(get_address('old strategy'))
+    new_strategy = StrategyUniswapPairPickle.deploy(vault, old_strategy.jar(), old_strategy.pid(), {'from': gov})
+    print('pricePerShare', vault.pricePerShare().to('ether'))
+    print('estimatedTotalAssets', old_strategy.estimatedTotalAssets().to('ether'))
+    vault.migrateStrategy(old_strategy, new_strategy, {'from': gov})
+    print('pricePerShare', vault.pricePerShare().to('ether'))
+    print('estimatedTotalAssets', new_strategy.estimatedTotalAssets().to('ether'))
+    keeper = accounts.at(new_strategy.keeper(), force=True)
+    for i in range(2):
+        new_strategy.harvest({'from': keeper})
+        print('pricePerShare', vault.pricePerShare().to('ether'))
+        print('estimatedTotalAssets', new_strategy.estimatedTotalAssets().to('ether'))
