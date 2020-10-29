@@ -22,16 +22,21 @@ def main():
         print(f"[{i}] {config['name']}")
     config = configurations["vaults"][int(input("choose configuration to deploy: "))]
     deployer = accounts.load(input("deployer account: "))
-    gov = get_address("gov")
-    rewards = get_address("rewards")
-    vault = Vault.deploy(
-        config["want"],
-        gov,
-        rewards,
-        config["name"],
-        config["symbol"],
-        {"from": deployer},
-    )
+    
+    if input('deploy vault? y/n: ') == 'y':
+        gov = get_address("gov")
+        rewards = get_address("rewards")
+        vault = Vault.deploy(
+            config["want"],
+            gov,
+            rewards,
+            config["name"],
+            config["symbol"],
+            {"from": deployer},
+        )
+    else:
+        vault = Vault.at(get_address('vault'))
+
     strategy = StrategyUniswapPairPickle.deploy(
         vault, config["jar"], config["pid"], {"from": deployer}
     )
