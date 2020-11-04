@@ -145,7 +145,7 @@ contract StrategyUniswapPairPickle is BaseStrategy {
      * are sustained for long periods of time.
      */
     function prepareReturn() internal override {
-        reserve = want.balanceOf(address(this)).sub(outstanding);
+        setReserve(want.balanceOf(address(this)).sub(outstanding));
         PickleChef(chef).deposit(pid, 0);
         uint _amount = IERC20(reward).balanceOf(address(this));
         if (_amount < 1 gwei) return;
@@ -163,7 +163,7 @@ contract StrategyUniswapPairPickle is BaseStrategy {
      * be 0, and you should handle that scenario accordingly.
      */
     function adjustPosition() internal override {
-        reserve = 0;
+        setReserve(0);
         uint _amount = want.balanceOf(address(this));
         if (_amount == 0) return;
         // stake lp tokens in pickle jar
