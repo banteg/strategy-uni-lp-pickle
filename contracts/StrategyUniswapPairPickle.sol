@@ -145,20 +145,28 @@ contract StrategyUniswapPairPickle is BaseStrategy {
         return want.balanceOf(address(this)).add(_staked_want).add(_unrealized_profit);
     }
 
+    /*
+     * Perform any strategy unwinding or other calls necessary to capture
+     * the "free return" this strategy has generated since the last time it's
+     * core position(s) were adusted. Examples include unwrapping extra rewards.
+     * This call is only used during "normal operation" of a Strategy, and should
+     * be optimized to minimize losses as much as possible. It is okay to report
+     * "no returns", however this will affect the credit limit extended to the
+     * strategy and reduce it's overall position if lower than expected returns
+     * are sustained for long periods of time.
+     */
     function prepareReturn(uint256 _debtOutstanding) internal override returns (uint256 _profit) {
+        if (_debtOutstanding > 0) liquidatePosition(_debtOutstanding);
         setReserve(want.balanceOf(address(this)).sub(_debtOutstanding));
         // Claim Pickle rewards from Pickle Chef
         PickleChef(chef).deposit(pid, 0);
-        uint _amount = IERC20(pickle).balanceOf(address(this));
-        // Stake in Pickle Staking
-        if (_amount > 1 gwei) PickleStaking(staking).stake(_amount);
-        // Claim WETH from Pickle Staking
+        // Claim WETH rewards from Pickle Staking
         PickleStaking(staking).getReward();
-        // Swap WETH to LP token parts and add liquidity
-        _amount = IERC20(weth).balanceOf(address(this));
-        if (_amount > 1 gwei) {
-            swap(weth, token0, _amount / 2);
-            swap(weth, token1, _amount / 2);
+        // Swap WETH to LP token underlying and add liquidity
+        uint weth_balance = IERC20(weth).balanceOf(address(this));
+        if (weth_balance > 1 gwei) {
+            swap(weth, token0, weth_balance / 2);
+            swap(weth, token1, weth_balance / 2);
             add_liquidity();
         }
         return want.balanceOf(address(this)).sub(getReserve());
@@ -171,16 +179,17 @@ contract StrategyUniswapPairPickle is BaseStrategy {
      * was made is available for reinvestment. Also note that this number could
      * be 0, and you should handle that scenario accordingly.
      */
-    function adjustPosition() internal override {
+    function adjustPosition(uint256 _debtOutstanding) internal override {
         setReserve(0);
-        uint _amount = want.balanceOf(address(this));
-        if (_amount == 0) return;
-        // stake lp tokens in pickle jar
-        PickleJar(jar).deposit(_amount);
-        // stake jar in pickle farm
-        _amount = IERC20(jar).balanceOf(address(this));
-        if (_amount == 0) return;
-        PickleChef(chef).deposit(pid, _amount);
+        // Stake LP tokens into Pickle Jar
+        uint _want = want.balanceOf(address(this));
+        if (_want > 0) PickleJar(jar).deposit(_want);
+        // Stake Jar tokens into Pickle Farm
+        uint _jar = IERC20(jar).balanceOf(address(this));
+        if (_jar > 0) PickleChef(chef).deposit(pid, _jar);
+        // Stake Pickle into Pickle Staking
+        uint _pickle = IERC20(pickle).balanceOf(address(this));
+        if (_pickle > 0) PickleStaking(staking).stake(_pickle);
     }
 
     /*
