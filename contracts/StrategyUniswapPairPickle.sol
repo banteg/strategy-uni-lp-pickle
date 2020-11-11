@@ -261,16 +261,6 @@ contract StrategyUniswapPairPickle is BaseStrategy {
         return time_trigger && (cost_trigger || credit_trigger);
     }
 
-    function setGasFactor(uint256 _gasFactor) public {
-        require(msg.sender == strategist || msg.sender == governance());
-        gasFactor = _gasFactor;
-    }
-
-    function setInterval(uint256 _interval) public {
-        require(msg.sender == strategist || msg.sender == governance());
-        interval = _interval;
-    }
-
     /*
      * Do anything necesseary to prepare this strategy for migration, such
      * as transfering any reserve or LP tokens, CDPs, or other tokens or stores of value.
@@ -289,6 +279,16 @@ contract StrategyUniswapPairPickle is BaseStrategy {
         protected[0] = address(want);
         protected[1] = reward;
         return protected;
+    }
+
+    function setGasFactor(uint256 _gasFactor) public {
+        require(msg.sender == strategist || msg.sender == governance());
+        gasFactor = _gasFactor;
+    }
+
+    function setInterval(uint256 _interval) public {
+        require(msg.sender == strategist || msg.sender == governance());
+        interval = _interval;
     }
 
     // ******** HELPER METHODS ************
