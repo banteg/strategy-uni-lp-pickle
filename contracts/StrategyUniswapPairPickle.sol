@@ -4,7 +4,7 @@ pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
 // These are the core Yearn libraries
-import {BaseStrategy, StrategyParams} from "@yearnvaultsV2/contracts/BaseStrategy.sol";
+import {BaseStrategy, StrategyParams} from "./BaseStrategy.sol";
 import "@openzeppelinV3/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelinV3/contracts/math/SafeMath.sol";
 import "@openzeppelinV3/contracts/utils/Address.sol";
@@ -24,6 +24,14 @@ interface PickleChef {
     function poolInfo(uint256 _pid) external view returns (address, uint256, uint256, uint256);
     function pendingPickle(uint256 _pid, address _user) external view returns (uint256);
     function userInfo(uint256 _pid, address _user) external view returns (uint256, uint256);
+}
+
+interface PickleStaking {
+    function earned(address account) external view returns (uint256);
+    function stake(uint256 amount) external;
+    function withdraw(uint256 amount) external;
+    function getReward() external;
+    function exit() external;
 }
 
 interface UniswapPair {
@@ -55,6 +63,10 @@ interface Uniswap {
     function getAmountsOut(uint amountIn, address[] memory path) external view returns (uint[] memory amounts);
 }
 
+/*
+    Uniswap LP => Pickle Jar => Pickle Farm => Pickle Staking => WETH rewards
+*/
+
 contract StrategyUniswapPairPickle is BaseStrategy {
     using SafeERC20 for IERC20;
     using Address for address;
@@ -62,7 +74,8 @@ contract StrategyUniswapPairPickle is BaseStrategy {
 
     string public constant override name = "StrategyUniswapPairPickle";
     address public constant chef = 0xbD17B1ce622d73bD438b9E658acA5996dc394b0d;
-    address public constant reward = 0x429881672B9AE42b8EbA0E26cD9C73711b891Ca5;
+    address public constant staking = 0xa17a8883dA1aBd57c690DF9Ebf58fC194eDAb66F;
+    address public constant pickle = 0x429881672B9AE42b8EbA0E26cD9C73711b891Ca5;
     address public constant uniswap = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
     address public constant weth = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     address public jar;
@@ -84,9 +97,7 @@ contract StrategyUniswapPairPickle is BaseStrategy {
         token1 = UniswapPair(address(want)).token1();
         want.safeApprove(jar, type(uint256).max);
         IERC20(jar).safeApprove(chef, type(uint256).max);
-        IERC20(reward).safeApprove(uniswap, type(uint256).max);
-        IERC20(token0).safeApprove(uniswap, type(uint256).max);
-        IERC20(token1).safeApprove(uniswap, type(uint256).max);
+        IERC20(pickle).safeApprove(staking, type(uint256).max);
     }
 
     // ******** OVERRIDE THESE METHODS FROM BASE CONTRACT ************
@@ -134,25 +145,23 @@ contract StrategyUniswapPairPickle is BaseStrategy {
         return want.balanceOf(address(this)).add(_staked_want).add(_unrealized_profit);
     }
 
-    /*
-     * Perform any strategy unwinding or other calls necessary to capture
-     * the "free return" this strategy has generated since the last time it's
-     * core position(s) were adusted. Examples include unwrapping extra rewards.
-     * This call is only used during "normal operation" of a Strategy, and should
-     * be optimized to minimize losses as much as possible. It is okay to report
-     * "no returns", however this will affect the credit limit extended to the
-     * strategy and reduce it's overall position if lower than expected returns
-     * are sustained for long periods of time.
-     */
-    function prepareReturn() internal override {
-        setReserve(want.balanceOf(address(this)).sub(outstanding));
+    function prepareReturn(uint256 _debtOutstanding) internal override returns (uint256 _profit) {
+        setReserve(want.balanceOf(address(this)).sub(_debtOutstanding));
+        // Claim Pickle rewards from Pickle Chef
         PickleChef(chef).deposit(pid, 0);
-        uint _amount = IERC20(reward).balanceOf(address(this));
-        if (_amount < 1 gwei) return;
-        swap(reward, token0, _amount / 2);
-        _amount = IERC20(reward).balanceOf(address(this));
-        swap(reward, token1, _amount);
-        add_liquidity();
+        uint _amount = IERC20(pickle).balanceOf(address(this));
+        // Stake in Pickle Staking
+        if (_amount > 1 gwei) PickleStaking(staking).stake(_amount);
+        // Claim WETH from Pickle Staking
+        PickleStaking(staking).getReward();
+        // Swap WETH to LP token parts and add liquidity
+        _amount = IERC20(weth).balanceOf(address(this));
+        if (_amount > 1 gwei) {
+            swap(weth, token0, _amount / 2);
+            swap(weth, token1, _amount / 2);
+            add_liquidity();
+        }
+        return want.balanceOf(address(this)).sub(getReserve());
     }
 
     /*
@@ -291,6 +300,7 @@ contract StrategyUniswapPairPickle is BaseStrategy {
     }
 
     function swap(address token_in, address token_out, uint amount_in) internal {
+        if (token_in == token_out) return;
         bool is_weth = token_in == weth || token_out == weth;
         address[] memory path = new address[](is_weth ? 2 : 3);
         path[0] = token_in;
@@ -300,6 +310,8 @@ contract StrategyUniswapPairPickle is BaseStrategy {
             path[1] = weth;
             path[2] = token_out;
         }
+        if (IERC20(token_in).allowance(address(this), uniswap) < amount_in)
+            IERC20(token_in).safeApprove(uniswap, type(uint256).max);
         Uniswap(uniswap).swapExactTokensForTokens(
             amount_in,
             0,
