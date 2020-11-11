@@ -266,18 +266,17 @@ contract StrategyUniswapPairPickle is BaseStrategy {
      * as transfering any reserve or LP tokens, CDPs, or other tokens or stores of value.
      */
     function prepareMigration(address _newStrategy) internal override {
-        // TODO: Transfer any non-`want` tokens to the new strategy
         exitPosition();
         want.transfer(_newStrategy, want.balanceOf(address(this)));
     }
 
-    // NOTE: Override this if you typically manage tokens inside this contract
-    //       that you don't want swept away from you randomly.
-    //       By default, only contains `want`
     function protectedTokens() internal override view returns (address[] memory) {
-        address[] memory protected = new address[](2);
+        address[] memory protected = new address[](5);
         protected[0] = address(want);
-        protected[1] = reward;
+        protected[1] = pickle;
+        protected[2] = jar;
+        protected[3] = token0;
+        protected[4] = token1;
         return protected;
     }
 
