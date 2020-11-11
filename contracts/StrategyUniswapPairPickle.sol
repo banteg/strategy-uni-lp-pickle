@@ -65,6 +65,8 @@ interface Uniswap {
 
 /*
     Uniswap LP => Pickle Jar => Pickle Farm => Pickle Staking => WETH rewards
+
+    Builds up a Pickle position in Pickle Staking.
 */
 
 contract StrategyUniswapPairPickle is BaseStrategy {
@@ -102,15 +104,11 @@ contract StrategyUniswapPairPickle is BaseStrategy {
 
     // ******** OVERRIDE THESE METHODS FROM BASE CONTRACT ************
 
-    /*
-     * Provide an accurate expected value for the return this strategy
-     * would provide to the Vault if `report()` was called right now
-     */
-    function expectedReturn() public override view returns (uint256 _liquidity) {
-        uint256 _earned = PickleChef(chef).pendingPickle(pid, address(this));
-        if (_earned / 2 == 0) return 0;
-        uint256 _amount0 = quote(reward, token0, _earned / 2);
-        uint256 _amount1 = quote(reward, token1, _earned / 2);
+    function expectedReturn() public view returns (uint256) {
+        uint256 _earned = PickleStaking(staking).earned(address(this));
+        if (_earned < 1 gwei) return 0;
+        uint256 _amount0 = quote(weth, token0, _earned / 2);
+        uint256 _amount1 = quote(weth, token1, _earned / 2);
         (uint112 _reserve0, uint112 _reserve1, ) = UniswapPair(address(want)).getReserves();
         uint256 _supply = IERC20(want).totalSupply();
         return Math.min(
@@ -118,6 +116,7 @@ contract StrategyUniswapPairPickle is BaseStrategy {
             _amount1.mul(_supply).div(_reserve1)
         );
     }
+
     /*
      * Provide an accurate estimate for the total amount of assets (principle + return)
      * that this strategy is currently managing, denominated in terms of `want` tokens.
@@ -131,18 +130,17 @@ contract StrategyUniswapPairPickle is BaseStrategy {
      *       conditions (e.g. this function is possible to influence through flashloan
      *       attacks, oracle manipulations, or other DeFi attack mechanisms).
      *
-     * NOTE: It is up to governance to use this function in order to correctly order
-     *       this strategy relative to its peers in order to minimize losses for the
-     *       Vault based on sudden withdrawals. This value should be higher than the
-     *       total debt of the strategy and higher than it's expected value to be "safe".
+     * NOTE: It is up to governance to use this function to correctly order this strategy
+     *       relative to its peers in the withdrawal queue to minimize losses for the Vault
+     *       based on sudden withdrawals. This value should be higher than the total debt of
+     *       the strategy and higher than it's expected value to be "safe".
      */
     function estimatedTotalAssets() public override view returns (uint256) {
-        // TODO: Build a more accurate estimate using the value of all positions in terms of `want`
+        uint256 _want = want.balanceOf(address(this));
         (uint256 _staked, ) = PickleChef(chef).userInfo(pid, address(this));
         uint256 _ratio = PickleJar(jar).getRatio();
-        uint256 _staked_want = _staked.mul(_ratio).div(1e18);
-        uint256 _unrealized_profit = expectedReturn();
-        return want.balanceOf(address(this)).add(_staked_want).add(_unrealized_profit);
+        uint256 _earned = expectedReturn();
+        return _want.add(_staked.mul(_ratio).div(1e18)).add(_earned);
     }
 
     /*
@@ -209,7 +207,7 @@ contract StrategyUniswapPairPickle is BaseStrategy {
         // Withdraw Pickle from Pickle Staking and transfer to governance
         PickleStaking(staking).exit();
         uint _pickle = IERC20(pickle).balanceOf(address(this));
-        IERC20(pickle).safeTrasnfer(governance(), _pickle);
+        IERC20(pickle).safeTransfer(governance(), _pickle);
     }
     /*
      * Liquidate as many assets as possible to `want`, irregardless of slippage,
@@ -231,10 +229,11 @@ contract StrategyUniswapPairPickle is BaseStrategy {
      * use that estimate to make a determination if calling it is "worth it" for the keeper.
      * This is not the only consideration into issuing this trigger, for example if the position
      * would be negatively affected if `tend()` is not called shortly, then this can return `true`
-     * even if the keeper might be "at a loss" (keepers are always reimbursed by yEarn)
+     * even if the keeper might be "at a loss" (keepers are always reimbursed by Yearn)
+     *
+     * NOTE: `callCost` must be priced in terms of `want`
      *
      * NOTE: this call and `harvestTrigger` should never return `true` at the same time.
-     * NOTE: if `tend()` is never intended to be called, it should always return `false`
      */
     function tendTrigger(uint256 gasCost) public override view returns (bool) {
         return false;
@@ -246,7 +245,9 @@ contract StrategyUniswapPairPickle is BaseStrategy {
      * use that estimate to make a determination if calling it is "worth it" for the keeper.
      * This is not the only consideration into issuing this trigger, for example if the position
      * would be negatively affected if `harvest()` is not called shortly, then this can return `true`
-     * even if the keeper might be "at a loss" (keepers are always reimbursed by yEarn)
+     * even if the keeper might be "at a loss" (keepers are always reimbursed by Yearn)
+     *
+     * NOTE: `callCost` must be priced in terms of `want`
      *
      * NOTE: this call and `tendTrigger` should never return `true` at the same time.
      */
@@ -297,10 +298,12 @@ contract StrategyUniswapPairPickle is BaseStrategy {
         require(token0 == weth || token1 == weth);  // dev: can only quote weth pairs
         (uint112 _reserve0, uint112 _reserve1, ) = UniswapPair(address(want)).getReserves();
         uint256 _supply = IERC20(want).totalSupply();
+        // Assume that pool is perfectly balanced
         return 2e18 * uint256(token0 == weth ? _reserve0 : _reserve1) / _supply;
     }
 
     function quote(address token_in, address token_out, uint256 amount_in) internal view returns (uint256) {
+        if (token_in == token_out) return amount_in;
         bool is_weth = token_in == weth || token_out == weth;
         address[] memory path = new address[](is_weth ? 2 : 3);
         path[0] = token_in;
