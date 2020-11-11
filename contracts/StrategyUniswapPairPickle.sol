@@ -163,10 +163,10 @@ contract StrategyUniswapPairPickle is BaseStrategy {
         // Claim WETH rewards from Pickle Staking
         PickleStaking(staking).getReward();
         // Swap WETH to LP token underlying and add liquidity
-        uint weth_balance = IERC20(weth).balanceOf(address(this));
-        if (weth_balance > 1 gwei) {
-            swap(weth, token0, weth_balance / 2);
-            swap(weth, token1, weth_balance / 2);
+        uint _weth = IERC20(weth).balanceOf(address(this));
+        if (_weth > 1 gwei) {
+            swap(weth, token0, _weth / 2);
+            swap(weth, token1, _weth / 2);
             add_liquidity();
         }
         return want.balanceOf(address(this)).sub(getReserve());
@@ -201,31 +201,28 @@ contract StrategyUniswapPairPickle is BaseStrategy {
      */
     function exitPosition() internal override {
         // Withdraw Jar tokens from Pickle Chef
-        (uint256 _staked, ) = PickleChef(chef).userInfo(pid, address(this));
+        (uint _staked, ) = PickleChef(chef).userInfo(pid, address(this));
         PickleChef(chef).withdraw(pid, _staked);
         // Withdraw LP tokens from Jar
-        uint256 _jar = IERC20(jar).balanceOf(address(this));
+        uint _jar = IERC20(jar).balanceOf(address(this));
         if (_jar > 0) PickleJar(jar).withdraw(_jar);
-        // Withdraw Pickle from Pickle Staking and liquidate for LP tokens
+        // Withdraw Pickle from Pickle Staking and transfer to governance
         PickleStaking(staking).exit();
-        uint256 _pickle = IERC20(pickle).balanceOf(address(this));
-        if (_pickle > 1 gwei) {
-            swap(pickle, token0, _pickle / 2);
-            swap(pickle, token1, _pickle / 2);
-            add_liquidity();
-        }
+        uint _pickle = IERC20(pickle).balanceOf(address(this));
+        IERC20(pickle).safeTrasnfer(governance(), _pickle);
     }
-
     /*
      * Liquidate as many assets as possible to `want`, irregardless of slippage,
-     * up to `_amount`. Any excess should be re-invested here as well.
+     * up to `_amountNeeded`. Any excess should be re-invested here as well.
      */
-    function liquidatePosition(uint256 _amount) internal override {
-        // TODO: Do stuff here to free up `_amount` from all positions back into `want`
-        (uint256 _staked, ) = PickleChef(chef).userInfo(pid, address(this));
-        uint256 _withdraw = _amount.mul(1e18).div(PickleJar(jar).getRatio());
-        PickleChef(chef).withdraw(pid, _withdraw);
-        PickleJar(jar).withdraw(IERC20(jar).balanceOf(address(this)));
+    function liquidatePosition(uint256 _amountNeeded) internal override returns (uint256 _amountFreed) {
+        uint _before = want.balanceOf(address(this));
+        (uint _staked, ) = PickleChef(chef).userInfo(pid, address(this));
+        uint _withdraw = _amountNeeded.mul(1e18).div(PickleJar(jar).getRatio());
+        PickleChef(chef).withdraw(pid, Math.min(_staked, _withdraw));
+        uint _jar = IERC20(jar).balanceOf(address(this));
+        PickleJar(jar).withdraw(_jar);
+        return want.balanceOf(address(this)).sub(_before);
     }
 
     /*
