@@ -200,10 +200,20 @@ contract StrategyUniswapPairPickle is BaseStrategy {
      * instead of `prepareReturn()`
      */
     function exitPosition() internal override {
-        // TODO: Do stuff here to free up as much as possible of all positions back into `want`
+        // Withdraw Jar tokens from Pickle Chef
         (uint256 _staked, ) = PickleChef(chef).userInfo(pid, address(this));
         PickleChef(chef).withdraw(pid, _staked);
-        PickleJar(jar).withdraw(IERC20(jar).balanceOf(address(this)));
+        // Withdraw LP tokens from Jar
+        uint256 _jar = IERC20(jar).balanceOf(address(this));
+        if (_jar > 0) PickleJar(jar).withdraw(_jar);
+        // Withdraw Pickle from Pickle Staking and liquidate for LP tokens
+        PickleStaking(staking).exit();
+        uint256 _pickle = IERC20(pickle).balanceOf(address(this));
+        if (_pickle > 1 gwei) {
+            swap(pickle, token0, _pickle / 2);
+            swap(pickle, token1, _pickle / 2);
+            add_liquidity();
+        }
     }
 
     /*
