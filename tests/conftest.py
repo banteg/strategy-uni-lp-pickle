@@ -44,8 +44,8 @@ def strategy(config, StrategyUniswapPairPickle, vault, strategist, token, keeper
     vault.addStrategy(
         strategy,
         token.totalSupply() / 2,  # Debt limit of 50% total supply
-        token.totalSupply() // 1000,  # Rate limt of 0.1% of token supply per block
-        50,  # 0.5% performance fee for Strategist
+        2 ** 256 - 1,  # Rate limt of 0.1% of token supply per block
+        0,  # no performance fee for Strategist
         {"from": gov},
     )
     return strategy
@@ -138,6 +138,17 @@ def whale(accounts):
 
 
 @pytest.fixture
+def pickle_whale(accounts):
+    # pickle/weth pair on uniswap v2
+    return accounts.at("0xdc98556Ce24f007A5eF6dC1CE96322d65832A819", force=True)
+
+
+@pytest.fixture
+def pickle(interface):
+    return interface.ERC20("0x429881672B9AE42b8EbA0E26cD9C73711b891Ca5")
+
+
+@pytest.fixture
 def weth(interface):
     return interface.ERC20("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2")
 
@@ -145,3 +156,8 @@ def weth(interface):
 @pytest.fixture
 def uniswap(interface, weth, whale):
     return interface.UniswapRouter("0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D")
+
+
+@pytest.fixture
+def pickle_staking(interface):
+    return interface.PickleStaking("0xa17a8883dA1aBd57c690DF9Ebf58fC194eDAb66F")

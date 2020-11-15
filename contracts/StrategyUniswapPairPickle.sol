@@ -100,6 +100,8 @@ contract StrategyUniswapPairPickle is BaseStrategy {
         want.safeApprove(jar, type(uint256).max);
         IERC20(jar).safeApprove(chef, type(uint256).max);
         IERC20(pickle).safeApprove(staking, type(uint256).max);
+        IERC20(token0).safeApprove(uniswap, type(uint256).max);
+        IERC20(token1).safeApprove(uniswap, type(uint256).max);
     }
 
     // ******** OVERRIDE THESE METHODS FROM BASE CONTRACT ************
