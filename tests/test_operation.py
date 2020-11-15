@@ -1,11 +1,6 @@
-blocks_per_year = 6525 * 365
-seconds_per_block = (86400 * 365) / blocks_per_year
-sample = 200
-
-
 def sleep(chain):
-    chain.sleep(int(sample * seconds_per_block))
-    chain.mine(sample)
+    chain.sleep(3600)
+    chain.mine(100)
 
 
 def test_vault_deposit(vault, token, whale):
@@ -52,13 +47,14 @@ def test_strategy_harvest(strategy, vault, token, whale, chain, jar, pickle_stra
     after = strategy.estimatedTotalAssets()
     assert after > before
     print("share price after: ", vault.pricePerShare().to("ether"))
-    print(f"implied apy: {(after / before - 1) / (sample / blocks_per_year):.5%}")
     # user withdraws all funds
     vault.withdraw(vault.balanceOf(whale), {"from": whale})
     assert token.balanceOf(whale) >= user_before
 
 
 def test_strategy_withdraw(strategy, vault, token, whale, gov, chain, pickle_strategy):
+    # acceptable loss
+    loss = 10 ** 6
     user_before = token.balanceOf(whale) + vault.balanceOf(whale)
     token.approve(vault, token.balanceOf(whale), {"from": whale})
     vault.deposit(token.balanceOf(whale), {"from": whale})
@@ -74,4 +70,4 @@ def test_strategy_withdraw(strategy, vault, token, whale, gov, chain, pickle_str
     assert deposits_after_savings > initial_deposits
     # user withdraws funds
     vault.withdraw(vault.balanceOf(whale), {"from": whale})
-    assert token.balanceOf(whale) >= user_before
+    assert token.balanceOf(whale) >= user_before - loss

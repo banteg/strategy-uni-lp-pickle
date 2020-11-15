@@ -11,6 +11,7 @@ def test_migration(
 ):
     def harvest(strat):
         chain.sleep(3600)
+        chain.mine(100)
         pickle_strategy.harvest({"from": whale})
         strat.harvest()
 
