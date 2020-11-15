@@ -132,15 +132,13 @@ def keeper(accounts):
 
 
 @pytest.fixture
-def whale(accounts):
+def whale(accounts, pickle):
     # makerdao eth-a join adapter, this address has a ton of weth
-    return accounts.at("0x2F0b23f53734252Bda2277357e97e1517d6B042A", force=True)
-
-
-@pytest.fixture
-def pickle_whale(accounts):
+    whale = accounts.at("0x2F0b23f53734252Bda2277357e97e1517d6B042A", force=True)
     # pickle/weth pair on uniswap v2
-    return accounts.at("0xdc98556Ce24f007A5eF6dC1CE96322d65832A819", force=True)
+    pickle_whale = accounts.at("0xdc98556Ce24f007A5eF6dC1CE96322d65832A819", force=True)
+    pickle.transfer(whale, pickle.balanceOf(pickle_whale) / 2, {"from": pickle_whale})
+    return whale
 
 
 @pytest.fixture

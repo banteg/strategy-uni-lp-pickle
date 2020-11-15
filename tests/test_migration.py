@@ -4,18 +4,18 @@ def test_migration(
     strategy,
     succ_strategy,
     gov,
-    pickle_whale,
+    whale,
     pickle_staking,
     pickle,
     pickle_strategy,
 ):
     def harvest(strat):
         chain.sleep(3600)
-        pickle_strategy.harvest({"from": pickle_whale})
+        pickle_strategy.harvest({"from": whale})
         strat.harvest()
 
-    pickle_before = pickle.balanceOf(pickle_whale) / 100
-    pickle.transfer(strategy, pickle_before, {"from": pickle_whale})
+    pickle_before = pickle.balanceOf(whale) / 2
+    pickle.transfer(strategy, pickle_before, {"from": whale})
 
     strategy.harvest()
     assert pickle_staking.balanceOf(strategy) == pickle_before
