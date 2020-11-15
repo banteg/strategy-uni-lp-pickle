@@ -182,7 +182,8 @@ contract StrategyUniswapPairPickle is BaseStrategy {
     function adjustPosition(uint256 _debtOutstanding) internal override {
         setReserve(0);
         // Stake LP tokens into Pickle Jar
-        uint _want = want.balanceOf(address(this)).sub(_debtOutstanding);
+        uint _want = want.balanceOf(address(this));
+        _want = _want.sub(Math.min(_want, _debtOutstanding));
         if (_want > 0) PickleJar(jar).deposit(_want);
         // Stake Jar tokens into Pickle Farm
         uint _jar = IERC20(jar).balanceOf(address(this));

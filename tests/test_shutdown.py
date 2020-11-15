@@ -1,12 +1,15 @@
-def test_shutdown(vault, token, strategy, chain):
-    chain.mine(100)
+def test_shutdown(vault, token, strategy, whale, pickle):
+    pickle_before = pickle.balanceOf(whale) / 2
+    pickle.transfer(strategy, pickle_before, {"from": whale})
     before = token.balanceOf(vault)
-    assert strategy.estimatedTotalAssets() == 0
+    # acceptable loss
+    loss = 10 ** 6
     strategy.harvest()
-    assert token.balanceOf(vault) == 0
-    assert strategy.estimatedTotalAssets() > before * 0.999
+    assert strategy.estimatedTotalAssets() >= before - loss
+    # pulled to strategy first
     strategy.setEmergencyExit()
-    assert strategy.estimatedTotalAssets() == 0
-    after = token.balanceOf(vault)
-    assert after > before * 0.999
-    print(f"loss: {(before - after).to('ether')} {after / before - 1:.18%}")
+    assert pickle.balanceOf(vault.governance()) >= pickle_before - loss
+    assert token.balanceOf(strategy) >= before - loss
+    # pulled to vault on harvest
+    strategy.harvest()
+    assert token.balanceOf(vault) >= before - loss
