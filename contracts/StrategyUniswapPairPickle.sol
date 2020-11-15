@@ -106,7 +106,7 @@ contract StrategyUniswapPairPickle is BaseStrategy {
 
     function expectedReturn() public view returns (uint256) {
         uint256 _earned = PickleStaking(staking).earned(address(this));
-        if (_earned < 1 gwei) return 0;
+        if (_earned / 2 == 0) return 0;
         uint256 _amount0 = quote(weth, token0, _earned / 2);
         uint256 _amount1 = quote(weth, token1, _earned / 2);
         (uint112 _reserve0, uint112 _reserve1, ) = UniswapPair(address(want)).getReserves();
@@ -180,7 +180,7 @@ contract StrategyUniswapPairPickle is BaseStrategy {
     function adjustPosition(uint256 _debtOutstanding) internal override {
         setReserve(0);
         // Stake LP tokens into Pickle Jar
-        uint _want = want.balanceOf(address(this));
+        uint _want = want.balanceOf(address(this)).sub(_debtOutstanding);
         if (_want > 0) PickleJar(jar).deposit(_want);
         // Stake Jar tokens into Pickle Farm
         uint _jar = IERC20(jar).balanceOf(address(this));
@@ -207,7 +207,7 @@ contract StrategyUniswapPairPickle is BaseStrategy {
         // Withdraw Pickle from Pickle Staking and transfer to governance
         PickleStaking(staking).exit();
         uint _pickle = IERC20(pickle).balanceOf(address(this));
-        IERC20(pickle).safeTransfer(governance(), _pickle);
+        if (_pickle > 0) IERC20(pickle).safeTransfer(governance(), _pickle);
     }
     /*
      * Liquidate as many assets as possible to `want`, irregardless of slippage,
@@ -216,8 +216,10 @@ contract StrategyUniswapPairPickle is BaseStrategy {
     function liquidatePosition(uint256 _amountNeeded) internal override returns (uint256 _amountFreed) {
         uint _before = want.balanceOf(address(this));
         (uint _staked, ) = PickleChef(chef).userInfo(pid, address(this));
+        // This could result in less amount freed because of rounding error
         uint _withdraw = _amountNeeded.mul(1e18).div(PickleJar(jar).getRatio());
         PickleChef(chef).withdraw(pid, Math.min(_staked, _withdraw));
+        // This could result in less amount freed because of withdrawal fees
         uint _jar = IERC20(jar).balanceOf(address(this));
         PickleJar(jar).withdraw(_jar);
         return want.balanceOf(address(this)).sub(_before);
@@ -254,8 +256,8 @@ contract StrategyUniswapPairPickle is BaseStrategy {
     function harvestTrigger(uint256 gasCost) public override view returns (bool) {
         uint256 _credit = vault.creditAvailable().mul(wantPrice()).div(1e18);
         uint256 _earned = PickleChef(chef).pendingPickle(pid, address(this));
-        uint256 _return = quote(reward, weth, _earned);
-        uint256 last_sync = vault.strategies(address(this)).lastSync;
+        uint256 _return = quote(pickle, weth, _earned);
+        uint256 last_sync = vault.strategies(address(this)).lastReport;
         bool time_trigger = block.number.sub(last_sync) >= interval;
         bool cost_trigger = _return > gasCost.mul(gasFactor);
         bool credit_trigger = _credit > gasCost.mul(gasFactor);
@@ -267,6 +269,7 @@ contract StrategyUniswapPairPickle is BaseStrategy {
      * as transfering any reserve or LP tokens, CDPs, or other tokens or stores of value.
      */
     function prepareMigration(address _newStrategy) internal override {
+        // Pickle is unstaked and sent to governance in this call
         exitPosition();
         want.transfer(_newStrategy, want.balanceOf(address(this)));
     }
