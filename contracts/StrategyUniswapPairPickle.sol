@@ -207,7 +207,8 @@ contract StrategyUniswapPairPickle is BaseStrategy {
         uint _jar = IERC20(jar).balanceOf(address(this));
         if (_jar > 0) PickleJar(jar).withdraw(_jar);
         // Withdraw Pickle from Pickle Staking and transfer to governance
-        PickleStaking(staking).exit();
+        uint _pickle_staked = IERC20(staking).balanceOf(address(this));
+        if (_pickle_staked > 0) PickleStaking(staking).exit();
         uint _pickle = IERC20(pickle).balanceOf(address(this));
         if (_pickle > 0) IERC20(pickle).safeTransfer(governance(), _pickle);
     }
