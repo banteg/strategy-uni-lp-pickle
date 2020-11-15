@@ -1,5 +1,7 @@
 # StrategyUniswapPairPickle
 
+![strategy](assets/strategy.png)
+
 ## Abstract
 
 - Uniswap LP is staked into Uniswap reward distributor
