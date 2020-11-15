@@ -4,8 +4,8 @@ sample = 200
 
 
 def sleep(chain):
-    chain.mine(sample)
     chain.sleep(int(sample * seconds_per_block))
+    chain.mine(sample)
 
 
 def test_vault_deposit(vault, token, whale):
@@ -28,7 +28,7 @@ def test_vault_withdraw(vault, token, whale):
 
 
 def test_strategy_harvest(strategy, vault, token, whale, chain, jar, pickle_strategy):
-    print('vault:', vault.name())
+    print("vault:", vault.name())
     user_before = token.balanceOf(whale) + vault.balanceOf(whale)
     token.approve(vault, token.balanceOf(whale), {"from": whale})
     vault.deposit(token.balanceOf(whale), {"from": whale})
@@ -47,10 +47,12 @@ def test_strategy_harvest(strategy, vault, token, whale, chain, jar, pickle_stra
     jar_ratio_after = jar.getRatio().to("ether")
     assert jar_ratio_after > jar_ratio_before
     strategy.harvest()
+    sleep(chain)
+    strategy.harvest()
     after = strategy.estimatedTotalAssets()
     assert after > before
     print("share price after: ", vault.pricePerShare().to("ether"))
-    # print(f"implied apy: {(after / before - 1) / (sample / blocks_per_year):.5%}")
+    print(f"implied apy: {(after / before - 1) / (sample / blocks_per_year):.5%}")
     # user withdraws all funds
     vault.withdraw(vault.balanceOf(whale), {"from": whale})
     assert token.balanceOf(whale) >= user_before

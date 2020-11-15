@@ -226,7 +226,7 @@ contract StrategyUniswapPairPickle is BaseStrategy {
         // This could result in less amount freed because of withdrawal fees
         uint _jar = IERC20(jar).balanceOf(address(this));
         PickleJar(jar).withdraw(_jar);
-        return want.balanceOf(address(this)).sub(_before);
+        return Math.min(want.balanceOf(address(this)).sub(_before), _amountNeeded);
     }
 
     /*
