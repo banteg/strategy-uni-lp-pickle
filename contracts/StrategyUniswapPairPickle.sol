@@ -155,7 +155,7 @@ contract StrategyUniswapPairPickle is BaseStrategy {
      * strategy and reduce it's overall position if lower than expected returns
      * are sustained for long periods of time.
      */
-    function prepareReturn(uint256 _debtOutstanding) internal override returns (uint256 _profit) {
+    function prepareReturn(uint256 _debtOutstanding) internal override returns (uint256 _profit, uint256 _loss) {
         if (_debtOutstanding > 0) liquidatePosition(_debtOutstanding);
         setReserve(want.balanceOf(address(this)).sub(_debtOutstanding));
         // Claim Pickle rewards from Pickle Chef
@@ -169,7 +169,7 @@ contract StrategyUniswapPairPickle is BaseStrategy {
             swap(weth, token1, _weth / 2);
             add_liquidity();
         }
-        return want.balanceOf(address(this)).sub(getReserve());
+        return (want.balanceOf(address(this)).sub(getReserve()), 0);
     }
 
     /*
@@ -200,7 +200,7 @@ contract StrategyUniswapPairPickle is BaseStrategy {
      * while not suffering exorbitant losses. This function is used during emergency exit
      * instead of `prepareReturn()`
      */
-    function exitPosition() internal override {
+    function exitPosition() internal override returns (uint256 _loss) {
         // Withdraw Jar tokens from Pickle Chef
         (uint _staked, ) = PickleChef(chef).userInfo(pid, address(this));
         PickleChef(chef).withdraw(pid, _staked);
@@ -212,6 +212,7 @@ contract StrategyUniswapPairPickle is BaseStrategy {
         if (_pickle_staked > 0) PickleStaking(staking).exit();
         uint _pickle = IERC20(pickle).balanceOf(address(this));
         if (_pickle > 0) IERC20(pickle).safeTransfer(governance(), _pickle);
+        return 0;
     }
     /*
      * Liquidate as many assets as possible to `want`, irregardless of slippage,
